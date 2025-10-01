@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Approve All</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      text-align: center;
+      margin-top: 80px;
+    }
+    .msg {
+      font-size: 18px;
+      color: #333;
+      margin-top: 20px;
+    }
+  </style>
+</head>
+<body>
+  <h2>Processing Approval...</h2>
+  <div class="msg" id="msg">⏳ Sending request...</div>
+
+  <script>
+    // mock employees[] ที่แนบมา
+    const employees = [
+      { id: "04106007", name: "Pisarn", date: "2025-09-29", project: "Present Test", hours: 2.5 },
+      { id: "04102004", name: "Danai", date: "2025-09-29", project: "Project A", hours: 3.0 }
+    ];
+
+    const webhookUrl = "http://localhost:5678/webhook/ot-approval-all";
+    const params = new URLSearchParams({
+      action: "approve-all",
+      employees: JSON.stringify(employees)
+    });
+
+    fetch(`${webhookUrl}?${params.toString()}`, {
+      method: "GET"
+    })
+    .then(r => r.json())
+    .then(data => {
+      document.getElementById("msg").innerText = "✅ Approved Success!";
+      console.log("Response:", data);
+    })
+    .catch(err => {
+      document.getElementById("msg").innerText = "❌ Error: " + err;
+    });
+  </script>
+</body>
+</html>

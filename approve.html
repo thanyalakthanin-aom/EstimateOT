@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>OT Auto Approval</title>
+  <style>
+    body { font-family: sans-serif; text-align: center; margin-top: 80px; }
+    #msg { font-size: 18px; font-weight: bold; }
+  </style>
+</head>
+<body>
+  <h2>Processing Request...</h2>
+  <div id="msg">⏳ Sending...</div>
+
+  <script>
+    const webhookUrl = "http://localhost:5678/webhook/ot-approval"; 
+
+// ✅ อ่านค่า parameter จาก URL
+const params = new URLSearchParams(window.location.search);
+const empId = params.get("id") || "UNKNOWN";
+const workDate = params.get("date") || new Date().toISOString().slice(0,10);
+const name = params.get("name") || "UNKNOWN";
+const hours = params.get("hours") || "";   // ✅ อย่าลืมอ่าน hours ด้วย
+const Manage = params.get("Manage") || "";
+
+// ✅ ยิง POST ทันทีที่เปิดหน้า
+fetch(webhookUrl, {
+  method: "POST",
+  headers: { "Content-Type": "application/json" },
+  body: JSON.stringify({
+    action: 'approve',
+    id: empId,        // ✅ ตรงกับที่ดึงมา
+    date: workDate,
+    name: name,       // ✅ ใช้ name ตรง ๆ
+    workingHour: hours,
+    Manage: Manage
+  })
+})
+  .then(res => res.json())   // ✅ parse response JSON (ถ้ามี)
+  .then(data => {
+    document.getElementById("msg").innerText = "✅ Approve Success!";
+  })
+  .catch(err => {
+    document.getElementById("msg").innerText = "❌ Error: " + err;
+  });
+  </script>
+</body>
+</html>

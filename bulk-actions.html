@@ -1,0 +1,137 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>Bulk Approve/Reject</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <style>
+    body{font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif; padding:24px; color:#222}
+    h2{margin:0 0 8px}
+    .hint{color:#666; margin-bottom:16px}
+    table{border-collapse:collapse; width:100%; margin:12px 0 20px; background:#fff}
+    th,td{border:1px solid #e5e7eb; padding:10px; text-align:left; font-size:14px}
+    thead th{background:#f3f4f6; font-weight:600}
+    tfoot td{font-weight:700; background:#fafafa}
+    .actions{display:flex; gap:12px; align-items:center; margin-top:10px}
+    .btn{display:inline-flex; align-items:center; gap:8px; padding:10px 16px; border-radius:8px;
+         border:0; cursor:pointer; font-weight:600; font-size:14px}
+    .btn-approve{background:#16a34a; color:#fff}
+    .btn-reject{background:#dc2626; color:#fff}
+    .msg{margin-top:10px; font-weight:600}
+    .ok{color:#16a34a}
+    .err{color:#dc2626}
+  </style>
+</head>
+<body>
+
+  <h2>Approve Estimate OT (Bulk)</h2>
+  <div class="hint">ตัวอย่างตาราง: คลิกปุ่มด้านล่างเพื่อส่ง <code>approve-all</code> หรือ <code>reject-all</code> ไปที่ Webhook</div>
+
+  <!-- ตัวอย่างข้อมูลที่จะแปลงเป็น employees[] (สามารถ generate จาก backend ได้) -->
+  <table id="otTable">
+    <thead>
+      <tr>
+        <th>#</th>
+        <th>EmployeeID</th>
+        <th>Name</th>
+        <th>Date</th>
+        <th>Estimate</th>
+        <th>Hours</th>
+        <th>Comment</th>
+      </tr>
+    </thead>
+    <tbody>
+      <!-- เก็บค่าใน data-* attribute เพื่ออ่านไปสร้าง payload ได้ง่าย -->
+      <tr data-empid="04003004" data-name="Pattanan" data-date="26/09/2025" data-hours="2.5" data-comment="">
+        <td>1</td><td>04003004</td><td>Pattanan</td><td>26/09/2025</td><td>18:30 - 21:00</td><td>2.5</td><td></td>
+      </tr>
+      <tr data-empid="04003004" data-name="Pattanan" data-date="27/09/2025" data-hours="2.5" data-comment="">
+        <td>2</td><td>04003004</td><td>Pattanan</td><td>27/09/2025</td><td>18:30 - 21:00</td><td>2.5</td><td></td>
+      </tr>
+      <tr data-empid="04003004" data-name="Pattanan" data-date="28/09/2025" data-hours="2.5" data-comment="">
+        <td>3</td><td>04003004</td><td>Pattanan</td><td>28/09/2025</td><td>18:30 - 21:00</td><td>2.5</td><td></td>
+      </tr>
+    </tbody>
+    <tfoot>
+      <tr>
+        <td colspan="5" style="text-align:right">Total</td>
+        <td id="totalHours"></td>
+        <td></td>
+      </tr>
+    </tfoot>
+  </table>
+
+  <div class="actions">
+    <button class="btn btn-approve" id="btnApproveAll">✅ Approve All</button>
+    <button class="btn btn-reject"  id="btnRejectAll">❌ Reject All</button>
+    <span id="msg" class="msg"></span>
+  </div>
+
+  <script>
+    // >>> เปลี่ยนเป็น URL ของ Webhook จริงของอ้อม
+    const webhookUrl = "http://localhost:5678/webhook/ot-approval";
+
+    // คำนวณ Total hours (UI เล็กน้อย)
+    (function calcTotal() {
+      const rows = [...document.querySelectorAll('#otTable tbody tr')];
+      const total = rows.reduce((s, r) => s + (+r.dataset.hours || 0), 0);
+      document.getElementById('totalHours').textContent = total.toFixed(2);
+    })();
+
+    // สร้าง employees[] จากแถวในตาราง
+    function collectEmployees() {
+      const rows = document.querySelectorAll('#otTable tbody tr');
+      const employees = [];
+      rows.forEach((row) => {
+        employees.push({
+          EmployeeID  : row.dataset.empid || "",
+          Date        : row.dataset.date  || "",
+          Name        : row.dataset.name  || "",
+          WorkingHour : row.dataset.hours || "",
+          Comment     : row.dataset.comment || ""
+        });
+      });
+      return employees;
+    }
+
+    // ยิง POST ไป Webhook (รองรับกรณี webhook ไม่ส่ง JSON กลับ)
+    async function postAction(action) {
+      const msg = document.getElementById('msg');
+      msg.className = "msg";
+      msg.textContent = "⏳ Sending…";
+
+      const body = {
+        action,
+        employees: collectEmployees()
+      };
+
+      try {
+        const res = await fetch(webhookUrl, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(body)
+        });
+
+        // บางครั้ง webhook อาจไม่ส่ง JSON -> พาร์สแบบปลอดภัย
+        const text = await res.text();
+        let data;
+        try { data = JSON.parse(text); } catch { data = { status: res.ok ? "ok" : "error", raw: text }; }
+
+        if (res.ok) {
+          msg.textContent = `✅ ${action} success${data.updatedCount ? " (" + data.updatedCount + " rows)" : ""}`;
+          msg.classList.add("ok");
+        } else {
+          msg.textContent = `❌ ${action} failed: ` + (data.message || text);
+          msg.classList.add("err");
+        }
+      } catch (err) {
+        msg.textContent = "❌ Network/Error: " + err.message;
+        msg.classList.add("err");
+      }
+    }
+
+    document.getElementById('btnApproveAll').addEventListener('click', () => postAction('approve-all'));
+    document.getElementById('btnRejectAll').addEventListener('click',  () => postAction('reject-all'));
+  </script>
+</body>
+</html>
